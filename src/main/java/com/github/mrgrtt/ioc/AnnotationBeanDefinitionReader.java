@@ -22,6 +22,7 @@ import java.util.jar.JarFile;
  */
 public class AnnotationBeanDefinitionReader implements BeanDefinitionReader {
     private String packageName;
+    private BeanNameGenerateStrategy nameGenerateStrategy = new DefaultBeanNameGenerateStrategy();
 
     public AnnotationBeanDefinitionReader(String packageName) {
         this.packageName = packageName;
@@ -33,6 +34,7 @@ public class AnnotationBeanDefinitionReader implements BeanDefinitionReader {
         List<BeanDefinition> bds = new ArrayList<BeanDefinition>();
         for (Class<?> cls: classes) {
             bds.add(createBeanDefinition(cls));
+            bds.addAll(createMethodBeanDefinitions(cls));
         }
         return bds;
     }
@@ -129,19 +131,7 @@ public class AnnotationBeanDefinitionReader implements BeanDefinitionReader {
             }
         });
 
-        String beanName = bean.name();
-        if ("".equals(beanName)) {
-            beanName = cls.getName() + "@" + df.hashCode();
-        }
-        df.setBeanName(beanName);
-
-        List<Method> beanMethods = new ArrayList<Method>();
-        for (Method m: cls.getMethods()) {
-            if (m.getAnnotation(Bean.class) != null && m.getReturnType() != Void.class) {
-                beanMethods.add(m);
-            }
-        }
-        df.setBeanMethods(beanMethods);
+        df.setBeanName(nameGenerateStrategy.getBeanName(cls, df, bean));
 
         List<Field> fields = new ArrayList<Field>();
         for (Field f: cls.getDeclaredFields()) {
@@ -152,5 +142,33 @@ public class AnnotationBeanDefinitionReader implements BeanDefinitionReader {
         df.setDependencyFields(fields);
 
         return df;
+    }
+
+    private List<BeanDefinition> createMethodBeanDefinitions(Class<?> cls) {
+        List<BeanDefinition> beanDefinitions = new ArrayList<>();
+        for (Method m: cls.getDeclaredMethods()) {
+            Bean bean = m.getAnnotation(Bean.class);
+            if (bean == null || m.getReturnType() == Void.TYPE) {
+                continue;
+            }
+
+            BeanDefinition bd = new BeanDefinition();
+            bd.setBeanName(nameGenerateStrategy.getBeanName(m.getReturnType(), bd, bean));
+            bd.setTypeClass(m.getReturnType());
+            bd.setScope(bean.scope());
+            bd.setDependencyFields(new ArrayList<>());
+            bd.setCreatorParams(m.getParameterTypes());
+            bd.setBeanCreator(params -> {
+                try {
+                    return m.invoke(null, params);
+                } catch (NullPointerException e) {
+                    throw new RuntimeException("@bean注解修饰方法时，只能修饰静态方法。");
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            beanDefinitions.add(bd);
+        }
+        return beanDefinitions;
     }
 }

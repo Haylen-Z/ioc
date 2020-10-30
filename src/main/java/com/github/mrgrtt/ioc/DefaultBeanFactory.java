@@ -43,8 +43,8 @@ public class DefaultBeanFactory implements BeanFactory {
 
     @Override
     public void addBean(Object bean) {
-        String beanName = bean.getClass().getName() + "@" + bean.hashCode();
-        addBean(beanName, bean);
+        BeanNameGenerateStrategy beanNameGenerateStrategy = new DefaultBeanNameGenerateStrategy();
+        addBean(beanNameGenerateStrategy.getBeanName(bean), bean);
     }
 
     @Override
@@ -127,9 +127,6 @@ public class DefaultBeanFactory implements BeanFactory {
         // 构造函数依赖注入
         for (int i = 0; i < constructorParamTypes.length; ++i) {
             Class<?> type = constructorParamTypes[i];
-            // 检测原型bean间的循环依赖
-            String paramBeanName = getBeanNameByType(type);
-
             Object paramBean = getBean(type);
             Asserts.notNull(paramBean, "不能够解决依赖：" + type.getName());
             constructorParams[i] = paramBean;
@@ -141,7 +138,6 @@ public class DefaultBeanFactory implements BeanFactory {
         // 解决@Injec依赖注入
         injectingBeans.put(beanName, bean);
         for (Field field: bd.getDependencyFields()) {
-            // 检测原型bean间的循环依赖
             String fieldBeanName = getFieldBeanName(field);
             injectFiledDependency(bean, field, fieldBeanName);
         }

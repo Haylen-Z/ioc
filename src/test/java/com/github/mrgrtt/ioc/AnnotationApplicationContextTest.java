@@ -57,4 +57,11 @@ class AnnotationApplicationContextTest {
             }
         });
     }
+
+    @Test
+    void beanMethodTest() {
+        ApplicationContext context =
+                new AnnotationApplicationContext("com.github.mrgrtt.ioc.bean_method_test");
+        assertNotNull(context.getBean(com.github.mrgrtt.ioc.bean_method_test.BeanD.class));
+    }
 }
