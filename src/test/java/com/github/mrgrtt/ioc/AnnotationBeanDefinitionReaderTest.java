@@ -18,7 +18,7 @@ class AnnotationBeanDefinitionReaderTest {
     public void test() throws IOException {
         Class<?>[] beanClasses = new Class[] {BeanA.class, BeanB.class, BeanC.class};
 
-        String packageName = "com.github.mrgrtt.ioc.beanreadertest";
+        String packageName = "com.github.mrgrtt.ioc.bean_reader_test";
         List<BeanDefinition> dfs = new AnnotationBeanDefinitionReader(packageName).getBeanDefinitions();
         assertEquals(beanClasses.length, dfs.size());
 
@@ -34,19 +34,19 @@ class AnnotationBeanDefinitionReaderTest {
             if (c == BeanA.class) {
                 assertEquals(df.getDependencyFields().size(), 2);
                 assertEquals(df.getBeanMethods().size(), 1);
-                assertEquals(df.getDefaultConstruct().getTypeParameters().length, 0);
+                assertEquals(df.getCreatorParams().length, 0);
             }
             if (c == BeanB.class) {
                 assertEquals(df.getDependencyFields().size(), 0);
                 assertEquals(df.getBeanMethods().size(), 0);
-                assertEquals(df.getDefaultConstruct().getParameters().length, 2);
+                assertEquals(df.getCreatorParams().length, 2);
                 assertTrue(df.getScope() == Scope.PROTOTYPE);
 
             }
             if (c == BeanC.class) {
                 assertEquals(df.getDependencyFields().size(), 2);
                 assertEquals(df.getBeanMethods().size(), 0);
-                assertEquals(df.getDefaultConstruct().getTypeParameters().length, 0);
+                assertEquals(df.getCreatorParams().length, 0);
                 assertEquals(df.getBeanName(), "beanC");
             }
         }

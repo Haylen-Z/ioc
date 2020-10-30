@@ -10,8 +10,6 @@ public class BeanC {
     @Inject
     private BeanA beanA;
     @Inject
-    private BeanB beanB;
-    @Inject
     private BeanD beanD;
     @Inject(name = "e2")
     private Ie e;

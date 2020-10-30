@@ -9,7 +9,5 @@ import lombok.Getter;
 @Getter
 public class BeanA {
     @Inject
-    private BeanB beanB;
-    @Inject
     private BeanC beanC;
 }

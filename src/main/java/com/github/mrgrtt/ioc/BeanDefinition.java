@@ -3,7 +3,6 @@ package com.github.mrgrtt.ioc;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -18,7 +17,8 @@ import java.util.List;
 public class BeanDefinition {
     private Class<?> typeClass;
     private List<Field> dependencyFields;
-    private Constructor<?> defaultConstruct;
+    private Class<?>[] creatorParams;
+    private BeanCreator beanCreator;
     private List<Method> beanMethods;
     private String beanName;
     private Scope scope;

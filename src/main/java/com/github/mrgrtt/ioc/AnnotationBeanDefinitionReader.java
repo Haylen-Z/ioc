@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.JarURLConnection;
 import java.net.URL;
@@ -119,7 +120,14 @@ public class AnnotationBeanDefinitionReader implements BeanDefinitionReader {
 
         Bean bean = cls.getAnnotation(Bean.class);
         df.setScope(bean.scope());
-        df.setDefaultConstruct(cls.getConstructors()[0]);
+        df.setCreatorParams(cls.getConstructors()[0].getParameterTypes());
+        df.setBeanCreator(params -> {
+            try {
+                return cls.getConstructors()[0].newInstance(params);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         String beanName = bean.name();
         if ("".equals(beanName)) {

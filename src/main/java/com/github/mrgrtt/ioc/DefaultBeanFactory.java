@@ -2,7 +2,6 @@ package com.github.mrgrtt.ioc;
 
 import com.github.mrgrtt.ioc.annotation.Inject;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -38,7 +37,7 @@ public class DefaultBeanFactory implements BeanFactory {
     /**
      * 正在解决构造函数依赖的bean，用于检测构造函数循环依赖
      */
-    private Set<String> resolvingConstructDependencyBeans = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private Set<String> creatingBeans = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private List<BeanPostProcessor> postProcessors = new CopyOnWriteArrayList<>();
 
@@ -106,7 +105,7 @@ public class DefaultBeanFactory implements BeanFactory {
 
          BeanDefinition bd = beanNameBeanDefinitionMap.get(beanName);
         // 构造器循环依赖
-        if (resolvingConstructDependencyBeans.contains(beanName)) {
+        if (creatingBeans.contains(beanName)) {
             throw new RuntimeException("存在构造函数循环依赖，依赖的类型：" + bd.getTypeClass().getName());
         }
 
@@ -118,29 +117,25 @@ public class DefaultBeanFactory implements BeanFactory {
     }
 
     private Object getPrototype(String beanName, BeanDefinition bd) {
-        Constructor<?> constructor = bd.getDefaultConstruct();
-        Class<?>[] constructorParamTypes = constructor.getParameterTypes();
+        if (injectingBeans.containsKey(beanName)) {
+            throw new RuntimeException("存在原型循环依赖，依赖类型：" + bd.getTypeClass().getName());
+        }
+        Class<?>[] constructorParamTypes = bd.getCreatorParams();
         Object[] constructorParams = new Object[constructorParamTypes.length];
 
-        resolvingConstructDependencyBeans.add(beanName);
+        creatingBeans.add(beanName);
         // 构造函数依赖注入
         for (int i = 0; i < constructorParamTypes.length; ++i) {
             Class<?> type = constructorParamTypes[i];
             // 检测原型bean间的循环依赖
             String paramBeanName = getBeanNameByType(type);
-            checkPrototypeBeanCircleDependency(type, paramBeanName);
 
             Object paramBean = getBean(type);
             Asserts.notNull(paramBean, "不能够解决依赖：" + type.getName());
             constructorParams[i] = paramBean;
         }
-        Object bean;
-        try {
-            bean = constructor.newInstance(constructorParams);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        resolvingConstructDependencyBeans.remove(beanName);
+        Object bean = bd.getBeanCreator().create(constructorParams);
+        creatingBeans.remove(beanName);
 
         beforePropertySet(bean, bd);
         // 解决@Injec依赖注入
@@ -148,7 +143,6 @@ public class DefaultBeanFactory implements BeanFactory {
         for (Field field: bd.getDependencyFields()) {
             // 检测原型bean间的循环依赖
             String fieldBeanName = getFieldBeanName(field);
-            checkPrototypeBeanCircleDependency(field.getType(), fieldBeanName);
             injectFiledDependency(bean, field, fieldBeanName);
         }
         injectingBeans.remove(beanName);
@@ -165,17 +159,6 @@ public class DefaultBeanFactory implements BeanFactory {
             fieldBeanName = getBeanNameByType(field.getType());
         }
         return fieldBeanName;
-    }
-
-    /**
-     * 检测原型bean间的循环依赖
-     * @param type 依赖的类型
-     */
-    private void checkPrototypeBeanCircleDependency(Class<?> type, String beanName) {
-        BeanDefinition paramBd = beanNameBeanDefinitionMap.get(beanName);
-        if (paramBd.getScope() == Scope.PROTOTYPE && injectingBeans.containsKey(beanName)) {
-            throw new RuntimeException("存在构造函数循环依赖，依赖类型：" + type.getName());
-        }
     }
 
     private void injectFiledDependency(Object bean, Field field, String beanName) {
@@ -198,10 +181,9 @@ public class DefaultBeanFactory implements BeanFactory {
         }
 
         // 解决构造函数依赖
-        resolvingConstructDependencyBeans.add(beanName);
+        creatingBeans.add(beanName);
 
-        Constructor<?> constructor = bd.getDefaultConstruct();
-        Class<?>[] paramTypes = constructor.getParameterTypes();
+        Class<?>[] paramTypes = bd.getCreatorParams();
         Object[] params = new Object[paramTypes.length];
         for (int i = 0; i < paramTypes.length; ++i) {
             Object paramBean = getBean(paramTypes[i]);
@@ -209,15 +191,10 @@ public class DefaultBeanFactory implements BeanFactory {
             params[i] = paramBean;
         }
 
-        resolvingConstructDependencyBeans.remove(beanName);
+        creatingBeans.remove(beanName);
 
         // 创建bean
-        Object bean;
-        try {
-            bean = constructor.newInstance(params);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        Object bean = bd.getBeanCreator().create(params);
 
         beforePropertySet(bean, bd);
         // @Inject字段注入
@@ -241,7 +218,7 @@ public class DefaultBeanFactory implements BeanFactory {
     private Object afterPropertySet(Object bean, BeanDefinition bd) {
         Object processedBean = bean;
         for (BeanPostProcessor processor: this.postProcessors) {
-            bean =  processor.afterSetProperty(this, bd, bean);
+            processedBean =  processor.afterSetProperty(this, bd, bean);
         }
         return processedBean;
     }
@@ -256,7 +233,9 @@ public class DefaultBeanFactory implements BeanFactory {
         singletons.clear();
         List<Method> beanMethods = new LinkedList<>();
         for (String beanName: beanNameBeanDefinitionMap.keySet()) {
-            getBean(beanName);
+            if (beanNameBeanDefinitionMap.get(beanName).getScope() == Scope.SINGLETON) {
+                getBean(beanName);
+            }
         }
     }
 
