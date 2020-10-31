@@ -25,3 +25,8 @@ spring ioc 小轮子
         this.b = b;
       }
     }
+
+创建上下文，获取bean：
+
+    ApplicationContext context = new AnnotationApplicationContext("com.xxx.xxx.xxx");// 要扫描的包名
+    BeanA a = (BeanA) context.getBean(BeanA.class);
